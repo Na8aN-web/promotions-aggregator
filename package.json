@@ -4,6 +4,8 @@
   "private": true,
   "description": "Take-home: scraper + API + UI for mall promotions.",
   "scripts": {
+    "postinstall": "pnpm --filter @promo/api exec playwright install chromium",
+    "dev": "pnpm -r --parallel run dev",
     "dev:api": "pnpm --filter @promo/api dev",
     "dev:web": "pnpm --filter @promo/web dev",
     "scrape": "pnpm --filter @promo/api scrape",
