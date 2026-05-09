@@ -92,12 +92,14 @@ export function listPromotions(q: GetPromotionsQuery): PaginatedPromotions {
   }
   // Date-range filter: "promotions whose run window overlaps [startDate, endDate]".
   // Null start_date is treated as -infinity; null end_date as +infinity.
-  if (q.startDate) {
-    where.push("(end_date IS NULL OR end_date >= @startDate)");
+ if (q.startDate) {
+    // Deal must START on or after the user's startDate (strict containment).
+    where.push("(start_date IS NOT NULL AND start_date >= @startDate)");
     params.startDate = q.startDate;
   }
   if (q.endDate) {
-    where.push("(start_date IS NULL OR start_date <= @endDate)");
+    // Deal must END on or before the user's endDate (strict containment).
+    where.push("(end_date IS NOT NULL AND end_date <= @endDate)");
     params.endDate = q.endDate;
   }
 
