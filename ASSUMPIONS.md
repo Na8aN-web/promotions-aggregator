@@ -25,8 +25,7 @@ We considered sync (block the HTTP request until scrape finishes), but a 12-minu
 
 - **Concurrency = 1** (serial scraping). No parallel page fetches.
 - **1-second delay** between requests.
-- **Descriptive User-Agent**: `promotions-aggregator-takehome/0.1 (+contact: <email>)` — identifies us and gives the source admin a way to reach out.
-- **`robots.txt`** not checked programmatically. The `/sales` and `/stores` paths are public listings; we manually verified they're not crawl-restricted. Adding a check is trivial, scoped out for time.
+- The `/sales` and `/stores` paths are public listings; we manually verified they're not crawl-restricted. Adding a check is trivial, scoped out for time.
 
 ## Discoveries during the build
 
@@ -55,11 +54,3 @@ Many promotions are `01/01/2026 → 12/31/2026` evergreen offers (Columbia teach
 - **Image dimensions** — we capture URLs only; Next/Image with proper sizing would be a UI-quality win.
 - **A real test suite** — only the `db-smoke` script is included, not unit/integration tests for parsers or routes. Running through the UI is the integration test.
 - **URL-synced filter state** — the UI's filter state lives in React only. Reloading the page resets filters. Sharable filter URLs would be a nice next-iteration improvement.
-
-## What I'd do with another 4 hours
-
-1. Hours parser + use the `weekly` structured representation in the UI.
-2. A toggle between **strict** and **overlap** date-filter semantics.
-3. URL-synced filter state for sharable views.
-4. Dockerfiles and docker-compose for true one-command bring-up.
-5. Real tests for the date overlap math + the `findDateRange` parser — the most likely places to regress.
