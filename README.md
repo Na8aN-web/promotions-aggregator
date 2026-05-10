@@ -65,20 +65,20 @@ Open <http://localhost:3000> in your browser.
 ## Project structure
 promotions-aggregator/
 ├── apps/
-│   ├── api/                # Express server, scraper, DB
+│   ├── api/                          # Express server, scraper, DB
 │   │   └── src/
-│   │       ├── db/         # SQLite + repository functions
-│   │       ├── scraper/    # Playwright orchestration + parsers
-│   │       ├── server/     # Express app + routes
-│   │       └── scripts/    # CLI entries (scrape, smoke tests)
-│   └── web/                # Next.js UI
-│       └── src/app/page.tsx  # Search, filter, pagination, group-by-brand
+│   │       ├── db/                   # SQLite + repository functions
+│   │       ├── scraper/              # Playwright orchestration + parsers
+│   │       ├── server/               # Express app + routes
+│   │       └── scripts/              # CLI entries (scrape, smoke tests)
+│   └── web/                          # Next.js UI
+│       └── src/app/page.tsx          # Search, filter, pagination, group-by-brand
 ├── packages/
-│   └── shared/             # Zod schemas, types, constants
-├── data/                   # SQLite db file (gitignored)
-├── DESIGN.md               # Decisions & trade-offs (committed before code)
-├── ASSUMPTIONS.md          # Interpretations + mid-build discoveries
-└── README.md               # You are here
+│   └── shared/                       # Zod schemas, types, constants
+├── data/                             # SQLite db file (gitignored)
+├── DESIGN.md                         # Decisions & trade-offs (committed before code)
+├── ASSUMPTIONS.md                    # Interpretations + mid-build discoveries
+└── README.md                         # You are here
 
 ## API endpoints
 
