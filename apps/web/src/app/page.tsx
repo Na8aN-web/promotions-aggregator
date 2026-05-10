@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type {
   PaginatedPromotions,
   BrandWithCount,
@@ -295,14 +296,12 @@ function PromotionCard({ promo }: { promo: Promotion }) {
         )}
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span>{promo.endDate ? `Ends ${promo.endDate}` : "Ongoing"}</span>
-          <a
-            href={promo.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={`/promotions/${promo.id}`}
             className="text-blue-600 underline"
           >
-            View ↗
-          </a>
+            View details →
+          </Link>
         </div>
       </div>
     </article>
