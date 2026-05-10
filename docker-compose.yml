@@ -1,0 +1,28 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: promotions-api
+    ports:
+      - "4000:4000"
+    volumes:
+      # Persist DB on the host so scrapes survive container restarts AND
+      # share data with local `pnpm scrape` runs.
+      - ${PWD}/data:/app/apps/api/data
+    environment:
+      PORT: 4000
+      DATABASE_PATH: /app/apps/api/data/promotions.db
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: promotions-web
+    ports:
+      - "3000:3000"
+    environment:
+      # The browser hits this URL — must be host-reachable, not container-internal.
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      - api

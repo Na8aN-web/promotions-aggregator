@@ -1,69 +1,68 @@
-# ASSUMPTIONS.md
+# Promotions Aggregator (Single-Mall MVP)
 
-Interpretations we made of ambiguous parts of the brief, plus discoveries mid-build.
+Take-home build: scrapes promotions from a single mall portal, persists them, exposes them via a typed REST API, and renders a UI with search, date filtering, pagination, and a group-by-brand view.
 
-## Schema interpretations
+Source portal: [thepromenadeshopsatbriargate.com/sales](https://www.thepromenadeshopsatbriargate.com/sales)
 
-- **Brand normalized as a separate entity, not denormalized.** Each promotion holds a `brandId`. Brand metadata (hours, social links, website) lives once per brand. Trade-off rationale in DESIGN.md.
-- **Stable promotion id:** the source-portal numeric id, prefixed `deal-{id}` (e.g. `deal-3146666`). Pulled from the URL pattern `/deals/<id>/`. Brand id is `brand-{id}`. Re-scrapes UPSERT on this id, so duplicates are impossible — that's our dedup strategy.
-- **Dates** stored as `YYYY-MM-DD` strings (date-only, no timezone). `scrapedAt` is the only true datetime, stored as ISO 8601 UTC.
-- **Missing-data policy:** `null` for missing scalars, `[]` for missing collections (e.g. `socialLinks`). Consistent across the codebase. Required-everywhere fields: `id`, `name`, `sourceUrl`, `brandId` (nullable), `scrapedAt`.
+## Stack
 
-## Date-filter semantics
+- **Monorepo**: pnpm workspaces.
+  - `apps/api` — Express + TypeScript backend
+  - `apps/web` — Next.js 16 (App Router) + Tailwind 4 frontend
+  - `packages/shared` — Zod schemas + inferred TS types (single source of truth, FR10)
+- **Scraper**: Playwright (headless Chromium)
+- **Database**: SQLite via `better-sqlite3`
 
-**Strict containment.** A promotion is included in date-filtered results only if its full run window (`startDate` and `endDate`) falls inside the filter window. Promotions with either date null are excluded from date-filtered results — we don't have enough information to confirm containment. Without a date filter, all promotions appear (including those with no date data).
+## Prerequisites
 
-We considered overlap semantics ("show what's running at any point in the window") and went with strict containment because it matches account-manager intent ("show me what's *only* running this week") more reliably. A future toggle between modes is a clean addition.
+- **Node.js 22 LTS** (Node 24+ trips `better-sqlite3`'s native build on Windows)
+- **pnpm 9+** (`npm install -g pnpm`)
+- Git
+## Docker (one-command bring-up)
 
-## POST /scrape: async with job ID
+```bash
+docker compose up --build
+```
 
-The `POST /scrape` endpoint returns `202 Accepted` with a `jobId` immediately; the scrape runs in the background; clients poll `GET /scrape/:jobId` for status. Job state is in-memory and resets on server restart — acceptable for an MVP, would persist in production.
+The first build takes ~5–10 min (Chromium downloads inside the API image). After that, both servers boot in seconds.
 
-We considered sync (block the HTTP request until scrape finishes), but a 12-minute request hangs through every reasonable proxy timeout. Async is the only honest choice once a real scrape exists.
+Open <http://localhost:3000>.
 
-## Politeness strategy (NFR2)
+If you already ran `pnpm scrape` locally, the volume mount on `./data` means the API container sees your existing DB — nothing more to do.
 
-- **Concurrency = 1** (serial scraping). No parallel page fetches.
-- **1-second delay** between requests.
-- **Descriptive User-Agent**: `promotions-aggregator-takehome/0.1 (+contact: <email>)` — identifies us and gives the source admin a way to reach out.
-- **`robots.txt`** not checked programmatically. The `/sales` and `/stores` paths are public listings; we manually verified they're not crawl-restricted. Adding a check is trivial, scoped out for time.
+If the DB is empty (fresh clone, no local scrape), trigger one inside the container:
 
-## Discoveries during the build
+```bash
+curl -X POST http://localhost:4000/scrape
+# returns { jobId: "...", status: "queued" }
+# poll with: curl http://localhost:4000/scrape/<jobId>
+```
 
-### The site is picky about HTTP clients (confirmed)
-The brief warned about this. We confirmed by trying `fetch` directly: empty bodies for all four URLs we tried. Using Playwright (a real Chromium browser) sidesteps the entire issue — it negotiates redirects, headers, and any anti-fetch heuristics transparently. Bonus: `page.evaluate()` lets us run real DOM queries inside the browser instead of parsing HTML in Node.
+Refresh <http://localhost:3000> after the job reports `"status": "done"`.
 
-### `__name` runtime error in `page.evaluate` callbacks
-`tsx` (our TypeScript runner) compiles named arrow functions inside `page.evaluate` callbacks to `__name(fn, "name")` calls (esbuild's keep-names support). That helper isn't defined in the browser when Playwright serializes the callback. Fixed by injecting a `__name` no-op shim via `addInitScript` before any page navigation. The fix is two lines; the symptom would have looked baffling without naming the cause.
+Stop with `Ctrl+C`, or `docker compose down` to clean up.
 
-### Brand hours come from the mall, not the brand
-Each brand page on the source shows the **mall's** general hours, not the individual store's hours. So most brands display the same `Mon – Sat: 10am – 8pm; Sun: 11am – 6pm`. We capture what's there (the `raw` field has the unparsed string); a `weekly` structured representation is null because writing a parser for the format wasn't worth the time. Per-store hours, where they actually differ, would be a follow-on.
+## Quick start
 
-### Brand `socialLinks` mix mall socials with brand socials
-The brand page on the source includes both the brand's own socials (when present) and the mall's footer-level socials (Twitter/Facebook/Instagram of `ShopsBriargate`). We capture both; the mall ones appear on every brand. A real version would dedupe these per-brand or filter to "this brand's specific socials" using stricter heuristics.
+```bash
+git clone <this-repo-url>
+cd promotions-aggregator
 
-### `websiteUrl` is sometimes an affiliate redirector
-Some brands (Athleta, Sephora, Free People) link out via affiliate URLs (`tkqlhce.com`, `flexlinkspro.com`, `shopstyle.it`) instead of their canonical domains. We store the link as found; resolving to the canonical domain would require a HEAD-fetch chain, scoped out for time.
+# Install everything (deps + Playwright Chromium via postinstall hook)
+pnpm install
 
-### Year-long evergreen discounts dominate
-Many promotions are `01/01/2026 → 12/31/2026` evergreen offers (Columbia teacher/military/senior/student discounts, etc.). They behave correctly under our strict-containment date filter, but for "what's running this week" the overlap semantics would feel more useful. The toggle mentioned above would address this cleanly.
+# Populate the SQLite DB by running a fresh scrape (~12 minutes — intentional politeness)
+pnpm scrape
 
-## What we cut for time
+# Boot API on :4000 and Web on :3000 in parallel
+pnpm dev
+```
 
-- **Hours parsing** — the `weekly` structured representation is null everywhere. The schema is in place; the parser is unwritten.
-- **Description sanitization** — descriptions include legal disclaimer paragraphs. A real version would either truncate or move disclaimers to a separate field.
-- **Image dimensions** — we capture URLs only; Next/Image with proper sizing would be a UI-quality win.
-- **A real test suite** — only the `db-smoke` script is included, not unit/integration tests for parsers or routes. Running through the UI is the integration test.
-- **URL-synced filter state** — the UI's filter state lives in React only. Reloading the page resets filters. Sharable filter URLs would be a nice next-iteration improvement.
+Open <http://localhost:3000> in your browser.
 
-## What I'd do with another 4 hours
+> **Tip:** to bring everything up in two commands, chain the first two: `pnpm install && pnpm scrape && pnpm dev`.
 
-1. Hours parser + use the `weekly` structured representation in the UI.
-2. A toggle between **strict** and **overlap** date-filter semantics.
-3. URL-synced filter state for sharable views.
-4. Dockerfiles and docker-compose for true one-command bring-up.
-5. Real tests for the date overlap math + the `findDateRange` parser — the most likely places to regress.
-
+## Project structure
 promotions-aggregator/
 ├── apps/
 │   ├── api/                # Express server, scraper, DB
