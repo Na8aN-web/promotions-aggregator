@@ -22,8 +22,6 @@ Pipeline:
 **Politeness strategy:**
 - Serial scraping (concurrency = 1).
 - 1-second delay between requests.
-- Descriptive User-Agent: `promotions-aggregator-takehome/0.1 (+contact: jane.ugwu16@gmail.com)`.
-- `robots.txt` checked once at start; we abort paths it disallows.
 
 ## Schema choices
 
